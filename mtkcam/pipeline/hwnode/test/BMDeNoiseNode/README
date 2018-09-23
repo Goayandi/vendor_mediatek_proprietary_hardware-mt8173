@@ -1,0 +1,11 @@
+WHAT IT DOES?
+=============
+A test program for hwnode/BWDeNoiseNode of Halv3
+
+HOW IT WAS BUILT?
+==================
+test_bwdenoisenode
+
+HOW TO USE IT?
+==============
+execute test_bwdenoisenode

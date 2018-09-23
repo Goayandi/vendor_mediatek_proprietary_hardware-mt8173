@@ -1,0 +1,15 @@
+WHAT IT DOES?
+=============
+MediaTek camera modules.
+
+
+HOW IT WAS BUILT?
+==================
+libcam_platform.so
+libmtkcam_modulehelper.so
+
+
+HOW TO USE IT?
+==============
+Related API header file(s) are located under
+$(MTK_PATH_SOURCE)/hardware/mtkcam/include/mtkcam/main/core/

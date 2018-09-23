@@ -1,0 +1,31 @@
+LOCAL_PATH := $(call my-dir)
+ifndef DRVB_VERSION
+DRVB_VERSION := release
+endif
+
+$(info DRVB_VERSION=$(DRVB_VERSION))
+
+ifeq ($(DRVB_VERSION), release)
+include $(CLEAR_VARS)
+LOCAL_MODULE := libmtk_drvb
+LOCAL_SRC_FILES_64 := arm64/libmtk_drvb.so
+LOCAL_PROPRIETARY_MODULE := true
+LOCAL_MODULE_OWNER := mtk
+LOCAL_MODULE_CLASS := SHARED_LIBRARIES
+LOCAL_MODULE_SUFFIX := .so
+LOCAL_SHARED_LIBRARIES := libcutils libutils
+LOCAL_MULTILIB := 64
+include $(BUILD_PREBUILT)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := libmtk_drvb
+LOCAL_SRC_FILES_32 := arm/libmtk_drvb.so
+LOCAL_PROPRIETARY_MODULE := true
+LOCAL_MODULE_OWNER := mtk
+LOCAL_MODULE_CLASS := SHARED_LIBRARIES
+LOCAL_MODULE_SUFFIX := .so
+LOCAL_SHARED_LIBRARIES := libcutils libutils
+LOCAL_MULTILIB := 32
+include $(BUILD_PREBUILT)
+
+endif

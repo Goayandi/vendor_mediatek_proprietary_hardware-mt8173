@@ -1,0 +1,253 @@
+
+$(warning [FM]starting to build fm radio part...)  
+
+ifeq ($(MTK_FM_SUPPORT), yes)
+
+FM_CFG_FILE := fm_cust.cfg
+
+LOCAL_PATH:= $(call my-dir)
+
+FM_CUSTOM_PATH := $(LOCAL_PATH)/custom
+FM_CONFIG_PATH := ./config
+############################################### MT6627 FM config: start########################################
+ifeq ($(findstring MT6627_FM,$(MTK_FM_CHIP)),MT6627_FM)
+
+FM_CHIP := mt6627
+FM_PATCH_FILE_1 := mt6627_fm_v1_patch.bin
+FM_COEFF_FILE_1 := mt6627_fm_v1_coeff.bin
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := $(FM_PATCH_FILE_1)
+LOCAL_PROPRIETARY_MODULE := true
+LOCAL_MODULE_OWNER := mtk
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/firmware
+LOCAL_SRC_FILES := $(FM_CONFIG_PATH)/$(FM_CHIP)/$(LOCAL_MODULE)
+include $(BUILD_PREBUILT)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := $(FM_COEFF_FILE_1)
+LOCAL_PROPRIETARY_MODULE := true
+LOCAL_MODULE_OWNER := mtk
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/firmware
+LOCAL_SRC_FILES := $(FM_CONFIG_PATH)/$(FM_CHIP)/$(LOCAL_MODULE)
+include $(BUILD_PREBUILT)
+
+endif
+##### MT6627 FM config: end#####
+
+############################################### MT6625 FM config: start########################################
+ifeq ($(findstring MT6625_FM,$(MTK_FM_CHIP)),MT6625_FM)
+
+FM_CHIP := mt6627
+FM_PATCH_FILE_1 := mt6627_fm_v1_patch.bin
+FM_COEFF_FILE_1 := mt6627_fm_v1_coeff.bin
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := $(FM_PATCH_FILE_1)
+LOCAL_PROPRIETARY_MODULE := true
+LOCAL_MODULE_OWNER := mtk
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/firmware
+LOCAL_SRC_FILES := $(FM_CONFIG_PATH)/$(FM_CHIP)/$(LOCAL_MODULE)
+include $(BUILD_PREBUILT)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := $(FM_COEFF_FILE_1)
+LOCAL_PROPRIETARY_MODULE := true
+LOCAL_MODULE_OWNER := mtk
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/firmware
+LOCAL_SRC_FILES := $(FM_CONFIG_PATH)/$(FM_CHIP)/$(LOCAL_MODULE)
+include $(BUILD_PREBUILT)
+
+endif
+##### MT6625 FM config: end#####
+
+############################################### MT6580 FM config: start########################################
+ifeq ($(findstring MT6580_FM,$(MTK_FM_CHIP)),MT6580_FM)
+
+FM_CHIP := mt6580
+FM_PATCH_FILE_1 := mt6580_fm_v1_patch.bin
+FM_COEFF_FILE_1 := mt6580_fm_v1_coeff.bin
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := $(FM_PATCH_FILE_1)
+LOCAL_PROPRIETARY_MODULE := true
+LOCAL_MODULE_OWNER := mtk
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/firmware
+LOCAL_SRC_FILES := $(FM_CONFIG_PATH)/$(FM_CHIP)/$(LOCAL_MODULE)
+include $(BUILD_PREBUILT)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := $(FM_COEFF_FILE_1)
+LOCAL_PROPRIETARY_MODULE := true
+LOCAL_MODULE_OWNER := mtk
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/firmware
+LOCAL_SRC_FILES := $(FM_CONFIG_PATH)/$(FM_CHIP)/$(LOCAL_MODULE)
+include $(BUILD_PREBUILT)
+
+endif
+##### MT6580 FM config: end#####
+
+
+############################################### MT6630 FM config: start########################################
+ifeq ($(findstring MT6630_FM,$(MTK_FM_CHIP)),MT6630_FM)
+
+FM_CHIP := mt6630
+FM_PATCH_FILE_1 := $(FM_CHIP)_fm_v1_patch.bin
+FM_COEFF_FILE_1 := $(FM_CHIP)_fm_v1_coeff.bin
+FM_PATCH_FILE_2 := $(FM_CHIP)_fm_v2_patch.bin
+FM_COEFF_FILE_2 := $(FM_CHIP)_fm_v2_coeff.bin
+
+FM_TX_PATCH_FILE_1 := $(FM_CHIP)_fm_v1_patch_tx.bin
+FM_TX_COEFF_FILE_1 := $(FM_CHIP)_fm_v1_coeff_tx.bin
+FM_TX_PATCH_FILE_2 := $(FM_CHIP)_fm_v2_patch_tx.bin
+FM_TX_COEFF_FILE_2 := $(FM_CHIP)_fm_v2_coeff_tx.bin
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := $(FM_PATCH_FILE_1)
+LOCAL_PROPRIETARY_MODULE := true
+LOCAL_MODULE_OWNER := mtk
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/firmware
+LOCAL_SRC_FILES := $(FM_CONFIG_PATH)/$(FM_CHIP)/$(LOCAL_MODULE)
+include $(BUILD_PREBUILT)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := $(FM_TX_PATCH_FILE_1)
+LOCAL_PROPRIETARY_MODULE := true
+LOCAL_MODULE_OWNER := mtk
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/firmware
+LOCAL_SRC_FILES := $(FM_CONFIG_PATH)/$(FM_CHIP)/$(LOCAL_MODULE)
+include $(BUILD_PREBUILT)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := $(FM_PATCH_FILE_2)
+LOCAL_PROPRIETARY_MODULE := true
+LOCAL_MODULE_OWNER := mtk
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/firmware
+LOCAL_SRC_FILES := $(FM_CONFIG_PATH)/$(FM_CHIP)/$(LOCAL_MODULE)
+include $(BUILD_PREBUILT)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := $(FM_TX_PATCH_FILE_2)
+LOCAL_PROPRIETARY_MODULE := true
+LOCAL_MODULE_OWNER := mtk
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/firmware
+LOCAL_SRC_FILES := $(FM_CONFIG_PATH)/$(FM_CHIP)/$(LOCAL_MODULE)
+include $(BUILD_PREBUILT)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := $(FM_COEFF_FILE_1)
+LOCAL_PROPRIETARY_MODULE := true
+LOCAL_MODULE_OWNER := mtk
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/firmware
+LOCAL_SRC_FILES := $(FM_CONFIG_PATH)/$(FM_CHIP)/$(LOCAL_MODULE)
+include $(BUILD_PREBUILT)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := $(FM_TX_COEFF_FILE_1)
+LOCAL_PROPRIETARY_MODULE := true
+LOCAL_MODULE_OWNER := mtk
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/firmware
+LOCAL_SRC_FILES := $(FM_CONFIG_PATH)/$(FM_CHIP)/$(LOCAL_MODULE)
+include $(BUILD_PREBUILT)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := $(FM_COEFF_FILE_2)
+LOCAL_PROPRIETARY_MODULE := true
+LOCAL_MODULE_OWNER := mtk
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/firmware
+LOCAL_SRC_FILES := $(FM_CONFIG_PATH)/$(FM_CHIP)/$(LOCAL_MODULE)
+include $(BUILD_PREBUILT)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := $(FM_TX_COEFF_FILE_2)
+LOCAL_PROPRIETARY_MODULE := true
+LOCAL_MODULE_OWNER := mtk
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/firmware
+LOCAL_SRC_FILES := $(FM_CONFIG_PATH)/$(FM_CHIP)/$(LOCAL_MODULE)
+include $(BUILD_PREBUILT)
+
+endif
+##### MT6630 FM config: end#####
+
+############################################### MT6631 FM config: start########################################
+ifeq ($(findstring MT6631_FM,$(MTK_FM_CHIP)),MT6631_FM)
+
+FM_CHIP := mt6631
+FM_PATCH_FILE_1 := mt6631_fm_v1_patch.bin
+FM_COEFF_FILE_1 := mt6631_fm_v1_coeff.bin
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := $(FM_PATCH_FILE_1)
+LOCAL_PROPRIETARY_MODULE := true
+LOCAL_MODULE_OWNER := mtk
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/firmware
+LOCAL_SRC_FILES := $(FM_CONFIG_PATH)/$(FM_CHIP)/$(LOCAL_MODULE)
+include $(BUILD_PREBUILT)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := $(FM_COEFF_FILE_1)
+LOCAL_PROPRIETARY_MODULE := true
+LOCAL_MODULE_OWNER := mtk
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/firmware
+LOCAL_SRC_FILES := $(FM_CONFIG_PATH)/$(FM_CHIP)/$(LOCAL_MODULE)
+include $(BUILD_PREBUILT)
+
+endif
+##### MT6631 FM config: end#####
+
+############################################### MT6632 FM config: start########################################
+ifeq ($(findstring MT6632_FM,$(MTK_FM_CHIP)),MT6632_FM)
+
+FM_CHIP := mt6632
+FM_PATCH_FILE_1 := $(FM_CHIP)_fm_v1_patch.bin
+FM_COEFF_FILE_1 := $(FM_CHIP)_fm_v1_coeff.bin
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := $(FM_PATCH_FILE_1)
+LOCAL_PROPRIETARY_MODULE := true
+LOCAL_MODULE_OWNER := mtk
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/firmware
+LOCAL_SRC_FILES := $(FM_CONFIG_PATH)/$(FM_CHIP)/$(LOCAL_MODULE)
+include $(BUILD_PREBUILT)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := $(FM_COEFF_FILE_1)
+LOCAL_PROPRIETARY_MODULE := true
+LOCAL_MODULE_OWNER := mtk
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/firmware
+LOCAL_SRC_FILES := $(FM_CONFIG_PATH)/$(FM_CHIP)/$(LOCAL_MODULE)
+include $(BUILD_PREBUILT)
+
+endif
+##### MT6632 FM config: end#####
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := $(FM_CFG_FILE)
+LOCAL_PROPRIETARY_MODULE := true
+LOCAL_MODULE_OWNER := mtk
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/firmware
+LOCAL_SRC_FILES := $(FM_CONFIG_PATH)/$(FM_CHIP)/$(LOCAL_MODULE)
+include $(BUILD_PREBUILT)
+
+include $(call all-makefiles-under,$(LOCAL_PATH))
+
+endif

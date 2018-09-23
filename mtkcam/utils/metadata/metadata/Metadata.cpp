@@ -1,0 +1,1504 @@
+/* Copyright Statement:
+ *
+ * This software/firmware and related documentation ("MediaTek Software") are
+ * protected under relevant copyright laws. The information contained herein is
+ * confidential and proprietary to MediaTek Inc. and/or its licensors. Without
+ * the prior written permission of MediaTek inc. and/or its licensors, any
+ * reproduction, modification, use or disclosure of MediaTek Software, and
+ * information contained herein, in whole or in part, shall be strictly
+ * prohibited.
+ *
+ * MediaTek Inc. (C) 2010. All rights reserved.
+ *
+ * BY OPENING THIS FILE, RECEIVER HEREBY UNEQUIVOCALLY ACKNOWLEDGES AND AGREES
+ * THAT THE SOFTWARE/FIRMWARE AND ITS DOCUMENTATIONS ("MEDIATEK SOFTWARE")
+ * RECEIVED FROM MEDIATEK AND/OR ITS REPRESENTATIVES ARE PROVIDED TO RECEIVER
+ * ON AN "AS-IS" BASIS ONLY. MEDIATEK EXPRESSLY DISCLAIMS ANY AND ALL
+ * WARRANTIES, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE OR
+ * NONINFRINGEMENT. NEITHER DOES MEDIATEK PROVIDE ANY WARRANTY WHATSOEVER WITH
+ * RESPECT TO THE SOFTWARE OF ANY THIRD PARTY WHICH MAY BE USED BY,
+ * INCORPORATED IN, OR SUPPLIED WITH THE MEDIATEK SOFTWARE, AND RECEIVER AGREES
+ * TO LOOK ONLY TO SUCH THIRD PARTY FOR ANY WARRANTY CLAIM RELATING THERETO.
+ * RECEIVER EXPRESSLY ACKNOWLEDGES THAT IT IS RECEIVER'S SOLE RESPONSIBILITY TO
+ * OBTAIN FROM ANY THIRD PARTY ALL PROPER LICENSES CONTAINED IN MEDIATEK
+ * SOFTWARE. MEDIATEK SHALL ALSO NOT BE RESPONSIBLE FOR ANY MEDIATEK SOFTWARE
+ * RELEASES MADE TO RECEIVER'S SPECIFICATION OR TO CONFORM TO A PARTICULAR
+ * STANDARD OR OPEN FORUM. RECEIVER'S SOLE AND EXCLUSIVE REMEDY AND MEDIATEK'S
+ * ENTIRE AND CUMULATIVE LIABILITY WITH RESPECT TO THE MEDIATEK SOFTWARE
+ * RELEASED HEREUNDER WILL BE, AT MEDIATEK'S OPTION, TO REVISE OR REPLACE THE
+ * MEDIATEK SOFTWARE AT ISSUE, OR REFUND ANY SOFTWARE LICENSE FEES OR SERVICE
+ * CHARGE PAID BY RECEIVER TO MEDIATEK FOR SUCH MEDIATEK SOFTWARE AT ISSUE.
+ *
+ * The following software/firmware and/or related documentation ("MediaTek
+ * Software") have been modified by MediaTek Inc. All revisions are subject to
+ * any receiver's applicable license agreements with MediaTek Inc.
+ */
+
+/******************************************************************************
+ *
+ ******************************************************************************/
+#define LOG_TAG "MtkCam/Metadata"
+
+#include <mtkcam/utils/std/Log.h>
+#include <mtkcam/utils/std/common.h>
+//
+#include <utils/Vector.h>
+#include <utils/KeyedVector.h>
+#include <stdio.h>
+#include <stdlib.h>
+using namespace NSCam;
+using namespace android;
+using namespace std;
+
+//
+#include <mtkcam/utils/metadata/mtk_metadata_types.h>
+//
+#define get_mtk_metadata_tag_type(x) mType
+//
+/******************************************************************************
+ *
+ ******************************************************************************/
+#if (MTKCAM_HAVE_AEE_FEATURE == 1)
+#include <aee.h>
+#define AEE_ASSERT(String) \
+    do { \
+        CAM_LOGE("ASSERT("#String") fail"); \
+        aee_system_exception( \
+            "mtkcam/Metadata", \
+            NULL, \
+            DB_OPT_DEFAULT, \
+            String); \
+    } while(0)
+#else
+#define AEE_ASSERT(String)
+#endif
+/******************************************************************************
+ *
+ ******************************************************************************/
+class IMetadata::IEntry::Implementor
+{
+private:
+    Tag_t                           mTag;
+    int                             mType;
+
+public:     ////                    Instantiation.
+    virtual                         ~Implementor();
+                                    Implementor(Tag_t tag);
+    Implementor&                    operator=(Implementor const& other);
+                                    Implementor(Implementor const& other);
+
+public:     ////                    Accessors.
+
+    /**
+     * Return the tag.
+     */
+    virtual MUINT32                 tag() const;
+
+    /**
+     * Return the type.
+     */
+    virtual MINT32                  type() const;
+
+    /**
+     * Check to see whether it is empty (no items) or not.
+     */
+    virtual MBOOL                   isEmpty() const;
+
+    /**
+     * Return the number of items.
+     */
+    virtual MUINT                   count() const;
+
+    /**
+     * Return how many items can be stored without reallocating the backing store.
+     */
+    virtual MUINT                   capacity() const;
+
+    /**
+     * Set the capacity.
+     */
+    virtual MBOOL                   setCapacity(MUINT size);
+
+public:     ////                    Operations.
+
+    /**
+     * Clear all items.
+     * Note: Copy-on write.
+     */
+    virtual MVOID                   clear();
+
+    /**
+     * Delete an item at a given index.
+     * Note: Copy-on write.
+     */
+    virtual MERROR                  removeAt(MUINT index);
+
+
+#define IMETADATA_IENTRY_OPS_DECLARATION(_T) \
+    virtual MVOID                   push_back(_T const& item, Type2Type<_T>) \
+                                    {  \
+                                        mType = TYPE_##_T;\
+                                        mStorage_##_T.push_back(item); \
+                                    } \
+    virtual _T&                     editItemAt(MUINT index, Type2Type<_T>){ return mStorage_##_T.editItemAt(index); } \
+    virtual _T const&               itemAt(MUINT index, Type2Type<_T>) const { return reinterpret_cast<const _T&>(mStorage_##_T.itemAt(index)); } \
+    Vector<_T>                      mStorage_##_T;
+
+    IMETADATA_IENTRY_OPS_DECLARATION(MUINT8)
+    IMETADATA_IENTRY_OPS_DECLARATION(MINT32)
+    IMETADATA_IENTRY_OPS_DECLARATION(MFLOAT)
+    IMETADATA_IENTRY_OPS_DECLARATION(MINT64)
+    IMETADATA_IENTRY_OPS_DECLARATION(MDOUBLE)
+    IMETADATA_IENTRY_OPS_DECLARATION(MRational)
+    IMETADATA_IENTRY_OPS_DECLARATION(MPoint)
+    IMETADATA_IENTRY_OPS_DECLARATION(MSize)
+    IMETADATA_IENTRY_OPS_DECLARATION(MRect)
+    IMETADATA_IENTRY_OPS_DECLARATION(IMetadata)
+    IMETADATA_IENTRY_OPS_DECLARATION(Memory)
+
+#undef  IMETADATA_IENTRY_OPS_DECLARATION
+
+};
+
+/******************************************************************************
+ *
+ ******************************************************************************/
+#define RETURN_TYPE_OPS(_Type, _Ops) \
+    _Type == TYPE_MUINT8 ? \
+        mStorage_MUINT8._Ops : \
+    _Type == TYPE_MINT32 ? \
+        mStorage_MINT32._Ops : \
+    _Type == TYPE_MFLOAT ? \
+        mStorage_MFLOAT._Ops : \
+    _Type == TYPE_MINT64 ? \
+        mStorage_MINT64._Ops : \
+    _Type == TYPE_MDOUBLE ? \
+        mStorage_MDOUBLE._Ops : \
+    _Type == TYPE_MRational ? \
+        mStorage_MRational._Ops : \
+    _Type == TYPE_MPoint ? \
+        mStorage_MPoint._Ops : \
+    _Type == TYPE_MSize ? \
+        mStorage_MSize._Ops : \
+    _Type == TYPE_Memory ? \
+        mStorage_Memory._Ops : \
+    _Type == TYPE_MRect ? \
+        mStorage_MRect._Ops : \
+        mStorage_IMetadata._Ops; \
+
+#define SET_TYPE_OPS(_Type, _Ops, _Val) \
+    _Type == TYPE_MUINT8 ? \
+        mStorage_MUINT8._Ops(_Val) : \
+    _Type == TYPE_MINT32 ? \
+        mStorage_MINT32._Ops(_Val) : \
+    _Type == TYPE_MFLOAT ? \
+        mStorage_MFLOAT._Ops(_Val) : \
+    _Type == TYPE_MINT64 ? \
+        mStorage_MINT64._Ops(_Val) : \
+    _Type == TYPE_MDOUBLE ? \
+        mStorage_MDOUBLE._Ops(_Val) : \
+    _Type == TYPE_MRational ? \
+        mStorage_MRational._Ops(_Val) : \
+    _Type == TYPE_MPoint ? \
+        mStorage_MPoint._Ops(_Val) : \
+    _Type == TYPE_MSize ? \
+        mStorage_MSize._Ops(_Val) : \
+    _Type == TYPE_Memory ? \
+        mStorage_Memory._Ops(_Val) : \
+    _Type == TYPE_MRect ? \
+        mStorage_MRect._Ops(_Val) : \
+        mStorage_IMetadata._Ops(_Val);
+
+#define SRC_DST_OPERATOR(_Type, _Ops, _Src) \
+    if(_Type == TYPE_MUINT8) \
+        (mStorage_MUINT8 _Ops _Src.mStorage_MUINT8); \
+    else if(_Type == TYPE_MINT32) \
+        (mStorage_MINT32 _Ops _Src.mStorage_MINT32); \
+    else if(_Type == TYPE_MFLOAT) \
+        (mStorage_MFLOAT _Ops _Src.mStorage_MFLOAT); \
+    else if(_Type == TYPE_MINT64) \
+        (mStorage_MINT64 _Ops _Src.mStorage_MINT64); \
+    else if(_Type == TYPE_MDOUBLE) \
+        (mStorage_MDOUBLE _Ops _Src.mStorage_MDOUBLE); \
+    else if(_Type == TYPE_MRational) \
+        (mStorage_MRational _Ops _Src.mStorage_MRational); \
+    else if(_Type == TYPE_MPoint) \
+        (mStorage_MPoint _Ops _Src.mStorage_MPoint); \
+    else if(_Type == TYPE_MSize) \
+        (mStorage_MSize _Ops _Src.mStorage_MSize); \
+    else if(_Type == TYPE_MRect) \
+        (mStorage_MRect _Ops _Src.mStorage_MRect); \
+    else if(_Type == TYPE_Memory) \
+        (mStorage_Memory _Ops _Src.mStorage_Memory); \
+    else if(_Type == TYPE_IMetadata) \
+        (mStorage_IMetadata _Ops _Src.mStorage_IMetadata);
+/******************************************************************************
+ *
+ ******************************************************************************/
+IMetadata::IEntry::Implementor::
+Implementor(Tag_t tag)
+    : mTag(tag)
+    , mType(-1)
+#define STORAGE_DECLARATION(_T) \
+    , mStorage_##_T()
+
+    STORAGE_DECLARATION(MUINT8)
+    STORAGE_DECLARATION(MINT32)
+    STORAGE_DECLARATION(MFLOAT)
+    STORAGE_DECLARATION(MINT64)
+    STORAGE_DECLARATION(MDOUBLE)
+    STORAGE_DECLARATION(MRational)
+    STORAGE_DECLARATION(MPoint)
+    STORAGE_DECLARATION(MSize)
+    STORAGE_DECLARATION(MRect)
+    STORAGE_DECLARATION(IMetadata)
+    STORAGE_DECLARATION(Memory)
+
+#undef STORAGE_DECLARATION
+{
+}
+
+
+IMetadata::IEntry::Implementor::
+Implementor(IMetadata::IEntry::Implementor const& other)
+    : mTag(other.mTag)
+    , mType(other.mType)
+#define STORAGE_DECLARATION(_T) \
+    , mStorage_##_T(other.mStorage_##_T)
+
+    STORAGE_DECLARATION(MUINT8)
+    STORAGE_DECLARATION(MINT32)
+    STORAGE_DECLARATION(MFLOAT)
+    STORAGE_DECLARATION(MINT64)
+    STORAGE_DECLARATION(MDOUBLE)
+    STORAGE_DECLARATION(MRational)
+    STORAGE_DECLARATION(MPoint)
+    STORAGE_DECLARATION(MSize)
+    STORAGE_DECLARATION(MRect)
+    STORAGE_DECLARATION(IMetadata)
+    STORAGE_DECLARATION(Memory)
+
+#undef STORAGE_DECLARATION
+{
+}
+
+
+IMetadata::IEntry::Implementor&
+IMetadata::IEntry::Implementor::
+operator=(IMetadata::IEntry::Implementor const& other)
+{
+    if (this != &other)
+    {
+        mTag = other.mTag;
+        mType = other.mType;
+        SRC_DST_OPERATOR(get_mtk_metadata_tag_type(mTag), =, other);
+    }
+    else {
+        CAM_LOGW("this(%p) == other(%p)", this, &other);
+    }
+
+    return *this;
+}
+
+
+IMetadata::IEntry::Implementor::
+~Implementor()
+{
+}
+
+
+MUINT32
+IMetadata::IEntry::Implementor::
+tag() const
+{
+    return mTag;
+}
+
+MINT32
+IMetadata::IEntry::Implementor::
+type() const
+{
+    return mType;
+}
+
+MBOOL
+IMetadata::IEntry::Implementor::
+isEmpty() const
+{
+    return get_mtk_metadata_tag_type(mTag) == -1 ?
+           MTRUE : RETURN_TYPE_OPS(get_mtk_metadata_tag_type(mTag), isEmpty());
+}
+
+
+MUINT
+IMetadata::IEntry::Implementor::
+count() const
+{
+    return get_mtk_metadata_tag_type(mTag) == -1 ?
+           0 : RETURN_TYPE_OPS(get_mtk_metadata_tag_type(mTag), size());
+}
+
+
+MUINT
+IMetadata::IEntry::Implementor::
+capacity() const
+{
+    return get_mtk_metadata_tag_type(mTag) == -1 ?
+           0 : RETURN_TYPE_OPS(get_mtk_metadata_tag_type(mTag), capacity());
+}
+
+
+MBOOL
+IMetadata::IEntry::Implementor::
+setCapacity(MUINT size)
+{
+    MERROR ret = get_mtk_metadata_tag_type(mTag) == -1 ?
+                 MFALSE : SET_TYPE_OPS(get_mtk_metadata_tag_type(mTag), setCapacity, size);
+    return ret == NO_MEMORY ? MFALSE : ret;
+}
+
+
+MVOID
+IMetadata::IEntry::Implementor::
+clear()
+{
+      if (get_mtk_metadata_tag_type(mTag) != -1)
+        RETURN_TYPE_OPS(get_mtk_metadata_tag_type(mTag), clear());
+}
+
+
+MERROR
+IMetadata::IEntry::Implementor::
+removeAt(MUINT index)
+{
+    MERROR ret = get_mtk_metadata_tag_type(mTag) == -1 ?
+                  BAD_VALUE : SET_TYPE_OPS(get_mtk_metadata_tag_type(mTag), removeAt, index);
+    return ret == BAD_VALUE ? BAD_VALUE : OK;
+}
+
+
+#undef RETURN_TYPE_OPS
+#undef SET_TYPE_OPS
+#undef SRC_DST_OPERATOR
+/******************************************************************************
+ *
+ ******************************************************************************/
+#define AEE_IF_TAG_ERROR(_TAG_) \
+    if (_TAG_ == (uint32_t)-1) \
+    { \
+        CAM_LOGE("tag(%d) error", _TAG_); \
+        AEE_ASSERT("tag error"); \
+    }
+
+IMetadata::IEntry::
+IEntry(Tag_t tag)
+    : mpImp(new Implementor(tag))
+{
+}
+
+
+IMetadata::IEntry::
+IEntry(IMetadata::IEntry const& other)
+    : mpImp(new Implementor(*(other.mpImp)))
+{
+}
+
+
+IMetadata::IEntry::
+~IEntry()
+{
+    if(mpImp) delete mpImp;
+}
+
+
+IMetadata::IEntry&
+IMetadata::IEntry::
+operator=(IMetadata::IEntry const& other)
+{
+    if (this != &other) {
+        delete mpImp;
+        mpImp = new Implementor(*(other.mpImp));
+    }
+    else {
+        CAM_LOGW("this(%p) == other(%p)", this, &other);
+    }
+
+    return *this;
+}
+
+
+MUINT32
+IMetadata::IEntry::
+tag() const
+{
+    return mpImp->tag();
+}
+
+MINT32
+IMetadata::IEntry::
+type() const
+{
+    return mpImp->type();
+}
+
+MBOOL
+IMetadata::IEntry::
+isEmpty() const
+{
+    //AEE_IF_TAG_ERROR(tag())
+    return mpImp->isEmpty();
+}
+
+
+MUINT
+IMetadata::IEntry::
+count() const
+{
+    //AEE_IF_TAG_ERROR(tag())
+    return mpImp->count();
+}
+
+
+MUINT
+IMetadata::IEntry::
+capacity() const
+{
+    AEE_IF_TAG_ERROR(tag())
+    return mpImp->capacity();
+}
+
+
+MBOOL
+IMetadata::IEntry::
+setCapacity(MUINT size)
+{
+    AEE_IF_TAG_ERROR(tag())
+    return mpImp->setCapacity(size);
+}
+
+
+MVOID
+IMetadata::IEntry::
+clear()
+{
+    AEE_IF_TAG_ERROR(tag())
+    mpImp->clear();
+}
+
+
+MERROR
+IMetadata::IEntry::
+removeAt(MUINT index)
+{
+    AEE_IF_TAG_ERROR(tag())
+    return mpImp->removeAt(index);
+}
+
+
+#define ASSERT_CHECK(_defaultT, _T) \
+      CAM_LOGE_IF( TYPE_##_T != _defaultT, "tag(%x), type(%d) should be (%d)", tag(), TYPE_##_T, _defaultT); \
+      if (TYPE_##_T != _defaultT) { \
+          Utils::dumpCallStack(); \
+          AEE_ASSERT("type mismatch"); \
+      }
+#undef  ASSERT_CHECK
+
+#define IMETADATA_IENTRY_OPS_DECLARATION(_T) \
+MVOID \
+IMetadata::IEntry:: \
+push_back(_T const& item, Type2Type<_T> type) \
+{ \
+    AEE_IF_TAG_ERROR(tag()) \
+    mpImp->push_back(item, type); \
+} \
+_T& \
+IMetadata::IEntry:: \
+editItemAt(MUINT index, Type2Type<_T> type) \
+{ \
+    AEE_IF_TAG_ERROR(tag()) \
+    return mpImp->editItemAt(index, type); \
+} \
+_T const& \
+IMetadata::IEntry:: \
+itemAt(MUINT index, Type2Type<_T> type) const \
+{ \
+    AEE_IF_TAG_ERROR(tag()) \
+    return mpImp->itemAt(index, type); \
+}
+
+IMETADATA_IENTRY_OPS_DECLARATION(MUINT8)
+IMETADATA_IENTRY_OPS_DECLARATION(MINT32)
+IMETADATA_IENTRY_OPS_DECLARATION(MFLOAT)
+IMETADATA_IENTRY_OPS_DECLARATION(MINT64)
+IMETADATA_IENTRY_OPS_DECLARATION(MDOUBLE)
+IMETADATA_IENTRY_OPS_DECLARATION(MRational)
+IMETADATA_IENTRY_OPS_DECLARATION(MPoint)
+IMETADATA_IENTRY_OPS_DECLARATION(MSize)
+IMETADATA_IENTRY_OPS_DECLARATION(MRect)
+IMETADATA_IENTRY_OPS_DECLARATION(IMetadata)
+IMETADATA_IENTRY_OPS_DECLARATION(IMetadata::Memory)
+#undef  IMETADATA_IENTRY_OPS_DECLARATION
+
+#undef  AEE_IF_TAG_ERROR
+/******************************************************************************
+ *
+ ******************************************************************************/
+class IMetadata::Implementor
+{
+public:     ////                        Instantiation.
+    virtual                            ~Implementor();
+                                        Implementor();
+    Implementor&                        operator=(Implementor const& other);
+                                        Implementor(Implementor const& other);
+
+public:     ////                        operators
+    Implementor&                        operator+=(Implementor const& other);
+    Implementor const                   operator+(Implementor const& other);
+
+public:     ////                        Accessors.
+
+    /**
+     * Check to see whether it is empty (no entries) or not.
+     */
+    virtual MBOOL                       isEmpty() const;
+
+    /**
+     * Return the number of entries.
+     */
+    virtual MUINT                       count() const;
+
+public:     ////                        Operations.
+
+    /**
+     * Clear all entries.
+     * Note: Copy-on write.
+     */
+    virtual MVOID                       clear();
+
+    /**
+     * Delete an entry by tag.
+     * Note: Copy-on write.
+     */
+    virtual MERROR                      remove(Tag_t tag);
+
+    /**
+     * Sort all entries for faster find.
+     * Note: Copy-on write.
+     */
+    virtual MERROR                      sort();
+
+    /**
+     * Update metadata entry. An entry will be created if it doesn't exist already.
+     * Note: Copy-on write.
+     */
+    virtual MERROR                      update(Tag_t tag, IEntry const& entry);
+
+
+    /**
+    * Get metadata entry by tag for editing.
+    * Note: Copy-on write.
+    */
+    virtual IEntry&                     editEntryFor(Tag_t tag);
+
+    /**
+    * Get metadata entry by tag, with no editing.
+    */
+    virtual IEntry const&               entryFor(Tag_t tag) const;
+
+    /**
+     * Get metadata entry by index for editing.
+     */
+    virtual IEntry&                     editEntryAt(MUINT index);
+
+    /**
+     * Get metadata entry by index, with no editing.
+     */
+    virtual IEntry const&               entryAt(MUINT index) const;
+
+    /**
+     * Flatten IMetadata.
+     */
+    virtual size_t                      flatten(char* flattened, size_t buf_size, size_t pivot=0);
+
+    /**
+     * Unflatten IMetadata.
+     */
+    virtual size_t                      unflatten(char* flattened, size_t buf_size, size_t pivot=0);
+
+    virtual void                        dump(int layer=0);
+
+protected:
+    DefaultKeyedVector<Tag_t, IEntry>   mMap;
+};
+
+
+/******************************************************************************
+ *
+ ******************************************************************************/
+IMetadata::Implementor::
+Implementor()
+    : mMap()
+{
+
+}
+
+
+IMetadata::Implementor::
+Implementor(IMetadata::Implementor const& other)
+    : mMap(other.mMap)
+{
+}
+
+
+IMetadata::Implementor::
+~Implementor()
+{
+
+}
+
+
+IMetadata::Implementor&
+IMetadata::Implementor::
+operator+=(IMetadata::Implementor const& other)
+{
+    if (this != &other)
+    {
+        if( mMap.size() >= other.mMap.size() ) {
+            for(size_t idx = 0; idx < other.mMap.size(); idx++ )
+                mMap.add( other.mMap.keyAt(idx), other.mMap.valueAt(idx) );
+        } else {
+            auto temp = other.mMap;
+            for(size_t idx = 0; idx < mMap.size(); idx++ )
+                temp.add( mMap.keyAt(idx), mMap.valueAt(idx) );
+            mMap = temp;
+        }
+    }
+    else {
+        CAM_LOGW("this(%p) == other(%p)", this, &other);
+    }
+
+    return *this;
+}
+
+
+IMetadata::Implementor const
+IMetadata::Implementor::
+operator+(IMetadata::Implementor const& other)
+{
+    return Implementor(*this) += other;
+}
+
+
+IMetadata::Implementor&
+IMetadata::Implementor::
+operator=(IMetadata::Implementor const& other)
+{
+    if (this != &other)
+    {
+        //release mMap'storage
+        //assign other.mMap's storage pointer to mMap
+        //add 1 to storage's sharebuffer
+        mMap = other.mMap;
+    }
+    else {
+        CAM_LOGW("this(%p) == other(%p)", this, &other);
+    }
+
+    return *this;
+}
+
+
+MBOOL
+IMetadata::Implementor::
+isEmpty() const
+{
+    return mMap.isEmpty();
+}
+
+
+MUINT
+IMetadata::Implementor::
+count() const
+{
+    return mMap.size();
+}
+
+
+MVOID
+IMetadata::Implementor::
+clear()
+{
+    mMap.clear();
+}
+
+
+MERROR
+IMetadata::Implementor::
+remove(Tag_t tag)
+{
+    return mMap.removeItem(tag);
+}
+
+
+MERROR
+IMetadata::Implementor::
+sort()
+{
+
+    //keyedVector always sorted.
+    return OK;
+}
+
+
+MERROR
+IMetadata::Implementor::
+update(Tag_t tag, IEntry const& entry)
+{
+    return mMap.add(tag, entry);
+
+}
+
+
+IMetadata::IEntry&
+IMetadata::Implementor::
+editEntryFor(Tag_t tag)
+{
+    return mMap.editValueFor(tag);
+}
+
+
+IMetadata::IEntry const&
+IMetadata::Implementor::
+entryFor(Tag_t tag) const
+{
+    return mMap.valueFor(tag);
+}
+
+
+IMetadata::IEntry&
+IMetadata::Implementor::
+editEntryAt(MUINT index)
+{
+    return mMap.editValueAt(index);
+
+}
+
+
+IMetadata::IEntry const&
+IMetadata::Implementor::
+entryAt(MUINT index) const
+{
+    return mMap.valueAt(index);
+
+}
+
+#define DUMP_METADATA_STRING(_layer_, _msg_) \
+        CAM_LOGD("(L%d) %s", _layer_, _msg_.string());
+
+
+void
+IMetadata::Implementor::
+dump(int layer)
+{
+    for (size_t i = 0; i < mMap.size(); ++i) {
+        IMetadata::IEntry entry = mMap.valueAt(i);
+        android::String8 msg = String8::format( "[%s] Map(%zu/%zu) tag(%d) type(%d) count(%d) ",
+            __FUNCTION__, i, mMap.size(), entry.tag(), entry.type(), entry.count());
+        //
+        if ( TYPE_IMetadata == entry.type() ) {
+            for( size_t j = 0; j < entry.count(); ++j ) {
+                IMetadata* meta = &entry.editItemAt(j, Type2Type< IMetadata >());
+                msg += String8::format("metadata.. ");
+                DUMP_METADATA_STRING(layer, msg);
+                meta->dump(layer+1);
+            }
+        } else {
+            switch( entry.type() )
+            {
+            case TYPE_MUINT8:
+                for (size_t j=0; j<entry.count(); j++)
+                    msg += String8::format("%d ", entry.itemAt(j, Type2Type< MUINT8 >() ));
+                break;
+            case TYPE_MINT32:
+                for (size_t j=0; j<entry.count(); j++)
+                    msg += String8::format("%d ", entry.itemAt(j, Type2Type< MINT32 >() ));
+                break;
+            case TYPE_MINT64:
+                for (size_t j=0; j<entry.count(); j++)
+                    msg += String8::format("%" PRId64 " ", entry.itemAt(j, Type2Type< MINT64 >() ));
+                break;
+            case TYPE_MFLOAT:
+                for (size_t j=0; j<entry.count(); j++)
+                    msg += String8::format("%f ", entry.itemAt(j, Type2Type< MFLOAT >() ));
+                break;
+            case TYPE_MDOUBLE:
+                for (size_t j=0; j<entry.count(); j++)
+                    msg += String8::format("%lf ", entry.itemAt(j, Type2Type< MDOUBLE >() ));
+                break;
+            case TYPE_MSize:
+                for (size_t j=0; j<entry.count(); j++)
+                {
+                    MSize src_size = entry.itemAt(j, Type2Type< MSize >());
+                    msg += String8::format( "size(%d,%d) ", src_size.w, src_size.h );
+                }
+                break;
+            case TYPE_MRect:
+                for (size_t j=0; j<entry.count(); j++)
+                {
+                    MRect src_rect = entry.itemAt(j, Type2Type< MRect >());
+                    msg += String8::format( "rect(%d,%d,%d,%d) ",
+                                           src_rect.p.x, src_rect.p.y,
+                                           src_rect.s.w, src_rect.s.h );
+                }
+                break;
+            case TYPE_MPoint:
+                for (size_t j=0; j<entry.count(); j++)
+                {
+                    MPoint src_point = entry.itemAt(j, Type2Type< MPoint >());
+                    msg += String8::format( "point(%d,%d) ", src_point.x, src_point.y );
+                }
+                break;
+            case TYPE_MRational:
+                for (size_t j=0; j<entry.count(); j++)
+                {
+                    MRational src_rational = entry.itemAt(j, Type2Type< MRational >());
+                    msg += String8::format( "rational(%d,%d) ", src_rational.numerator, src_rational.denominator );
+                }
+                break;
+            case TYPE_Memory:
+                msg += String8::format("Memory type: not dump!");
+                break;
+            default:
+                msg += String8::format("unsupported type(%d)", entry.type());
+            }
+        }
+    DUMP_METADATA_STRING(layer, msg);
+    }
+}
+
+#if 0
+#define CAM_LOGD_TIME(fmt, arg...)     CAM_LOGD("[%s] " fmt, __FUNCTION__, ##arg)
+#define CAM_LOGD_TIME_SUB(fmt, arg...)     CAM_LOGD("[%s] " fmt, __FUNCTION__, ##arg)
+#else
+#define CAM_LOGD_TIME(fmt, arg...) 0
+#define CAM_LOGD_TIME_SUB(fmt, arg...) 0
+#endif
+
+template<class T>
+static void
+ConvertEntry(Vector<T> &storage, IMetadata::IEntry const& entry)
+{
+    for(uint32_t i = 0; i < entry.count(); i++) {
+        storage.push_back(entry.itemAt(i, Type2Type< T >() ));
+    }
+}
+
+static void
+ConvertMRect(Vector< MINT32 > &storage, IMetadata::IEntry const& entry)
+{
+    for(uint32_t i = 0; i < entry.count(); i++) {
+        MRect src_rect = entry.itemAt(i, Type2Type< MRect >());
+        storage.push_back(src_rect.p.x);
+        storage.push_back(src_rect.p.y);
+        storage.push_back(src_rect.s.w);
+        storage.push_back(src_rect.s.h);
+    }
+}
+
+static void
+ConvertMSize(Vector< MINT32 > &storage, IMetadata::IEntry const& entry)
+{
+    for(uint32_t i = 0; i < entry.count(); i++) {
+        MSize src_size = entry.itemAt(i, Type2Type< MSize >());
+        storage.push_back(src_size.w);
+        storage.push_back(src_size.h);
+    }
+}
+
+static void
+ConvertMPoint(Vector< MINT32 > &storage, IMetadata::IEntry const& entry)
+{
+    for(uint32_t i = 0; i < entry.count(); i++) {
+        MPoint src_point = entry.itemAt(i, Type2Type< MPoint >());
+        storage.push_back(src_point.x);
+        storage.push_back(src_point.y);
+    }
+}
+
+static void
+ConvertMRational(Vector< MINT32 > &storage, IMetadata::IEntry const& entry)
+{
+    for(uint32_t i = 0; i < entry.count(); i++) {
+        MRational src_rational = entry.itemAt(i, Type2Type< MRational >());
+        storage.push_back(src_rational.numerator);
+        storage.push_back(src_rational.denominator);
+    }
+}
+
+static void
+ConvertMemory(Vector< MUINT8 > &storage, IMetadata::IEntry const& entry)
+{
+    for(uint32_t i = 0; i < entry.count(); i++) {
+        IMetadata::Memory m = entry.itemAt(i, Type2Type< IMetadata::Memory >());
+        //storage.push_back(m.size());
+        storage.appendVector(m);
+    }
+}
+
+int gFlattenLayer = 0;
+int gUnflattenLayer = 0;
+
+#define CHECK_MOVE(_x) CAM_LOGE_IF(_x<0, "buffer overflow");
+
+template<class T>
+static size_t
+print(int type, Vector< T > &storage, char* str, size_t buf_size, size_t pivot)
+{
+    int move;
+    switch (type)
+    {
+        case TYPE_MUINT8:
+        case TYPE_MSize:
+        case TYPE_MRect:
+        case TYPE_MPoint:
+        case TYPE_MRational:
+        {
+            for ( size_t i = 0; i < storage.size(); ++i )
+            {
+                move = snprintf(str+pivot, buf_size-pivot, "%d ",(MINT32)storage[i]);
+                CHECK_MOVE(move);
+                pivot += move;
+            }
+        } break;
+        case TYPE_Memory:
+        {
+            memcpy(str+pivot, &storage[0], sizeof(MUINT8)*storage.size() );
+            pivot += sizeof(MUINT8)*storage.size();
+            move = snprintf(str+pivot, buf_size-pivot, " ");
+            CHECK_MOVE(move);
+            pivot += move;
+        } break;
+        case TYPE_MFLOAT: {
+            for ( size_t i = 0; i < storage.size(); ++i )
+            {
+                move = snprintf(str+pivot, buf_size-pivot, "%f ", (MFLOAT)storage[i]);
+                CHECK_MOVE(move);
+                pivot += move;
+            }
+        } break;
+        case TYPE_MINT32: {
+            for ( size_t i = 0; i < storage.size(); ++i )
+            {
+                move = snprintf(str+pivot, buf_size-pivot, "%d ", (MINT32)storage[i]);
+                CHECK_MOVE(move);
+                pivot += move;
+            }
+        } break;
+        case TYPE_MINT64: {
+            for ( size_t i = 0; i < storage.size(); ++i )
+            {
+                move = snprintf(str+pivot, buf_size-pivot, "%" PRId64 " ", (MINT64)storage[i]);
+                CHECK_MOVE(move);
+                pivot += move;
+            }
+        } break;
+        case TYPE_MDOUBLE: {
+            for ( size_t i = 0; i < storage.size(); ++i )
+            {
+                move = snprintf(str+pivot, buf_size-pivot, "%lf ", (MDOUBLE)storage[i]);
+                CHECK_MOVE(move);
+                pivot += move;
+            }
+        } break;
+        case TYPE_IMetadata: {
+        } break;
+        default: {
+            ALOGW("undefined type %d", type);
+            return -EINVAL;
+        }
+    };
+    //
+    return pivot;
+}
+
+
+#define NORMAL_PRINT_TO_STRING(_type_, _src_entry_, _dst_string_) \
+if ( TYPE_##_type_ == _src_entry_.type() ) {\
+    Vector<_type_> storage; \
+    ConvertEntry(storage, _src_entry_); \
+    pivot = print(TYPE_##_type_, storage, _dst_string_, buf_size, pivot); \
+    if( pivot<0 ) { \
+        return MFALSE; \
+    } \
+}
+
+#define SPECIAL_PRINT_TO_STRING(_type_, _vec_type_, _src_entry_, _dst_string_) \
+if ( TYPE_##_type_ == _src_entry_.type() ) {\
+    Vector<_vec_type_> storage; \
+    Convert##_type_(storage, _src_entry_); \
+    if ( TYPE_Memory == _src_entry_.type() ) {\
+        move = snprintf(_dst_string_+pivot, buf_size-pivot, "%zu ",storage.size()); \
+        CHECK_MOVE(move); \
+        pivot += move; \
+    } \
+    pivot = print( TYPE_##_type_ , storage, _dst_string_, buf_size, pivot); \
+    if( pivot<0 ) { \
+        return MFALSE; \
+    } \
+    move = snprintf(_dst_string_+pivot, buf_size-pivot, " "); \
+    CHECK_MOVE(move); \
+    pivot += move; \
+}
+
+#define ENTRY_TO_STRING(_src_entry_, _dst_string_) \
+    NORMAL_PRINT_TO_STRING(MUINT8,  _src_entry_, _dst_string_); \
+    NORMAL_PRINT_TO_STRING(MINT32,  _src_entry_, _dst_string_); \
+    NORMAL_PRINT_TO_STRING(MFLOAT,  _src_entry_, _dst_string_); \
+    NORMAL_PRINT_TO_STRING(MINT64,  _src_entry_, _dst_string_); \
+    NORMAL_PRINT_TO_STRING(MDOUBLE, _src_entry_, _dst_string_); \
+    SPECIAL_PRINT_TO_STRING(MRational, MINT32, _src_entry_, _dst_string_); \
+    SPECIAL_PRINT_TO_STRING(MRect,     MINT32, _src_entry_, _dst_string_); \
+    SPECIAL_PRINT_TO_STRING(MSize,     MINT32, _src_entry_, _dst_string_); \
+    SPECIAL_PRINT_TO_STRING(MPoint,    MINT32, _src_entry_, _dst_string_); \
+    SPECIAL_PRINT_TO_STRING(Memory,    MUINT8, _src_entry_, _dst_string_);
+
+size_t
+IMetadata::Implementor::
+flatten(char* flattened, size_t buf_size, size_t pivot)
+{
+    size_t move = 0;
+    MINT64 start_time = static_cast<MINT64>(::systemTime());
+    CAM_LOGD_TIME("layer(%d) map size: %d start:%lld", gFlattenLayer++, mMap.size(), start_time );
+    for (size_t i = 0; i < mMap.size(); ++i) {
+        // MINT64 sub_start_time = static_cast<MINT64>(::systemTime());
+        int cur = pivot;
+        IMetadata::IEntry entry = mMap.valueAt(i);
+        move = snprintf(flattened+pivot, buf_size-pivot, "%d %d %d ", entry.tag(), entry.type(), entry.count());
+        CHECK_MOVE(move);
+        pivot += move;
+        //
+        if ( TYPE_IMetadata == entry.type() ) {
+            for( size_t j = 0; j < entry.count(); ++j ) {
+                IMetadata* meta = &entry.editItemAt(j, Type2Type< IMetadata >());
+                pivot = meta->flatten(flattened, buf_size, pivot);
+                move = snprintf(flattened+pivot, buf_size-pivot, "; ");
+                CHECK_MOVE(move);
+                pivot += move;
+            }
+        } else {
+            ENTRY_TO_STRING(entry, flattened);
+        }
+        // MINT64 sub_end_time = static_cast<MINT64>(::systemTime());
+        // CAM_LOGD_TIME_SUB("layer(%d) flatten(%d) pivot(%d) %d %d %d -> %f : %s",
+        //      gFlattenLayer, i, pivot, entry.tag(), entry.type(), entry.count(),
+        //      ((float)(sub_end_time-sub_start_time))/1000000.f, flattened+cur );
+    }
+    MINT64 end_time = static_cast<MINT64>(::systemTime()) ;
+    CAM_LOGD_TIME("layer(%d) pivot(%d) flatten done: %lld -> %f",
+        gFlattenLayer--, pivot, end_time-start_time, ((float)(end_time-start_time))/1000000.f );
+    //
+    return pivot;
+}
+
+#undef NORMAL_PRINT_TO_STRING
+#undef SPECIAL_PRINT_TO_STRING
+#undef ENTRY_TO_STRING
+
+class metadata_extractor {
+public:
+                            metadata_extractor(char* sourceStr, size_t pivot)
+                                : mSource(sourceStr)
+                                , mPivot(pivot)
+                            {}
+    virtual                 ~metadata_extractor() {}
+
+    size_t                  getNextSpace()
+                            {
+                                char* next = strstr(mSource+mPivot+1, " ");
+                                if ( next == NULL )
+                                    return -1;
+                                return (next - (mSource+mPivot));
+                            }
+
+    char*                   getStringAndMovePivot()
+                            {
+                                while( *(mSource+mPivot)==' ' ) // init: move to non-space
+                                    movePivot(1);
+                                //
+                                size_t ret = mPivot;
+                                size_t move = getNextSpace();
+                                movePivot(move+1);
+                                return mSource+ret;
+                            }
+
+    char*                   getString(size_t offset=0) { return (offset==0)? mSource+mPivot : mSource+offset; }
+    char                    getSemicolon() { return *(mSource+mPivot+1); }
+
+    MERROR                  getInfo(MUINT32 &tag, int &type, int &count)
+                            {
+                                while( *(mSource+mPivot)==' ' ) // init: move to non-space
+                                    movePivot(1);
+                                //
+                                tag = atoi(mSource+mPivot);
+                                size_t move = getNextSpace();
+                                movePivot(move+1);
+                                //
+                                type = atoi(mSource+mPivot);
+                                move = getNextSpace();
+                                movePivot(move+1);
+                                //
+                                count = atoi(mSource+mPivot);
+                                move = getNextSpace();
+                                movePivot(move+1);
+                                //
+                                return OK;
+                            }
+
+    // pivot operation
+    size_t                  getPivot() { return mPivot; }
+    size_t                  setPivot(size_t pivot)
+                            {
+                                mPivot = pivot;
+                                return mPivot;
+                            }
+    size_t                  movePivot(size_t move)
+                            {
+                                mPivot += move;
+                                return mPivot;
+                            }
+
+protected:
+    char*                   mSource;
+    size_t                  mPivot;
+};
+
+template<class T>
+static MERROR
+Convert2Entry(int type, IMetadata::IEntry& entry, metadata_extractor* pExtractor, MINT32 count)
+{
+    switch (type)
+    {
+        case TYPE_MUINT8: {
+            for ( MINT32 i = 0; i < count; ++i ) {
+                T data = atoi( pExtractor->getStringAndMovePivot() );
+                entry.push_back(data, Type2Type< T >());
+            }
+        } break;
+        case TYPE_MINT32: {
+            for ( MINT32 i = 0; i < count; ++i ) {
+                T data = atol( pExtractor->getStringAndMovePivot() );
+                entry.push_back(data, Type2Type< T >());
+            }
+        } break;
+        case TYPE_MFLOAT:
+        case TYPE_MDOUBLE: {
+            for ( MINT32 i = 0; i < count; ++i ) {
+                T data = atof( pExtractor->getStringAndMovePivot() );
+                entry.push_back(data, Type2Type< T >());
+            }
+        } break;
+        case TYPE_MINT64: {
+            for ( MINT32 i = 0; i < count; ++i ) {
+                T data = atoll( pExtractor->getStringAndMovePivot() );
+                entry.push_back(data, Type2Type< T >());
+            }
+        } break;
+        default: {
+            ALOGW("undefined type %d", type);
+            return -EINVAL;
+        }
+    };
+    return OK;
+}
+
+static void
+Convert2MRect(IMetadata::IEntry& entry, metadata_extractor* pExtractor, MINT32 count)
+{
+    for ( MINT32 i = 0; i < count; ++i ) {
+        MPoint p( atoi( pExtractor->getStringAndMovePivot() ),
+                  atoi( pExtractor->getStringAndMovePivot() ) );
+        MSize  s( atoi( pExtractor->getStringAndMovePivot() ),
+                  atoi( pExtractor->getStringAndMovePivot() ) );
+        //
+        MRect rect(p, s);
+        entry.push_back(rect, Type2Type< MRect >());
+    }
+}
+
+template<class T>
+static void
+Convert2Entry2(IMetadata::IEntry& entry, metadata_extractor* pExtractor, MINT32 count)
+{
+    for ( MINT32 i = 0; i < count; ++i ) {
+        MINT32 x = atoi( pExtractor->getStringAndMovePivot() );
+        MINT32 y = atoi( pExtractor->getStringAndMovePivot() );
+        //
+        T data(x, y);
+        entry.push_back(data, Type2Type< T >());
+    }
+}
+
+static void
+Convert2Memory(IMetadata::IEntry& entry, metadata_extractor* pExtractor, MINT32 count)
+{
+    for ( MINT32 i = 0; i < count; ++i ) {
+        MINT32 vec_count = atoi( pExtractor->getStringAndMovePivot() );
+        //
+        IMetadata::Memory mMemory;
+        mMemory.resize(vec_count);
+        //
+        memcpy( mMemory.editArray(), pExtractor->getString(), sizeof(MUINT8)*vec_count);
+        //
+        pExtractor->movePivot(vec_count+1);
+        entry.push_back(mMemory, Type2Type< IMetadata::Memory >());
+    }
+}
+
+#define NORMAL_STRING_TO_ENTRY(_type_, _real_type_, _src_entry_, _extractor_, _count_) \
+if ( TYPE_##_type_ == _real_type_ ) { \
+    if ( Convert2Entry< _type_ >(TYPE_##_type_, _src_entry_, _extractor_, _count_) != OK ) {\
+        return MFALSE; \
+    } \
+}
+
+#define NORMAL_STRING_TO_ENTRY2(_type_, _real_type_, _src_entry_, _extractor_, _count_) \
+if ( TYPE_##_type_ == _real_type_ ) { \
+    Convert2Entry2< _type_ >(_src_entry_, _extractor_, _count_); \
+}
+
+#define SPECIAL_STRING_TO_ENTRY(_type_, _real_type_, _src_entry_, _extractor_, _count_) \
+if ( TYPE_##_type_ == _real_type_ ) { \
+    Convert2##_type_(_src_entry_, _extractor_, _count_); \
+}
+
+
+#define STRING_TO_ENTRY(_type_, _src_entry_, _extractor_, _count_) \
+    NORMAL_STRING_TO_ENTRY(MUINT8,     _type_, _src_entry_, _extractor_, _count_); \
+    NORMAL_STRING_TO_ENTRY(MINT32,     _type_, _src_entry_, _extractor_, _count_); \
+    NORMAL_STRING_TO_ENTRY(MFLOAT,     _type_, _src_entry_, _extractor_, _count_); \
+    NORMAL_STRING_TO_ENTRY(MINT64,     _type_, _src_entry_, _extractor_, _count_); \
+    NORMAL_STRING_TO_ENTRY(MDOUBLE,    _type_, _src_entry_, _extractor_, _count_); \
+    NORMAL_STRING_TO_ENTRY2(MRational, _type_, _src_entry_, _extractor_, _count_); \
+    SPECIAL_STRING_TO_ENTRY(MRect,     _type_, _src_entry_, _extractor_, _count_); \
+    NORMAL_STRING_TO_ENTRY2(MSize,     _type_, _src_entry_, _extractor_, _count_); \
+    NORMAL_STRING_TO_ENTRY2(MPoint,    _type_, _src_entry_, _extractor_, _count_); \
+    SPECIAL_STRING_TO_ENTRY(Memory,    _type_, _src_entry_, _extractor_, _count_);
+
+size_t
+IMetadata::Implementor::
+unflatten(char* flattened, size_t buf_size, size_t pivot)
+{
+    MINT64 start_time = static_cast<MINT64>(::systemTime());
+    CAM_LOGD_TIME( "layer(%d) unflatten:%d %d start:%lld",
+                   gUnflattenLayer++, buf_size, pivot, start_time);
+    metadata_extractor* pExtractor = new metadata_extractor(flattened, pivot);
+    //
+    Tag_t Tag;
+    int type, count;
+    int cur = pExtractor->getPivot();
+    while ( pExtractor->getPivot() < buf_size &&
+            pExtractor->getInfo(Tag, type, count)==OK ) {
+        MINT64 sub_start_time = static_cast<MINT64>(::systemTime());
+        //
+        IMetadata::IEntry entry( Tag );
+        if ( TYPE_IMetadata == type ) {
+            for( int j = 0; j < count; ++j ) {
+                IMetadata meta;
+                size_t pivot = meta.unflatten(flattened, buf_size, pExtractor->getPivot());
+                //
+                entry.push_back(meta, Type2Type< IMetadata >());
+                pExtractor->setPivot(pivot);   //"; "
+            }
+        } else {
+            STRING_TO_ENTRY(type, entry, pExtractor, count);
+            if ( pExtractor->getSemicolon()==';' ) {
+                pExtractor->movePivot(3);
+                mMap.add( Tag, entry);
+                // MINT64 sub_end_time = static_cast<MINT64>(::systemTime());
+                // CAM_LOGD_TIME_SUB("layer(%d) (%d) pivot(%d) buf(%d) %d %d %d -> %f : %s",
+                //               gUnflattenLayer, mMap.size(), pExtractor->getPivot(), buf_size, Tag, type, count,
+                //               ((float)(sub_end_time-sub_start_time))/1000000.f, pExtractor->getString(cur) );
+                goto lbExit;
+            }
+        }
+        mMap.add( Tag, entry);
+        // MINT64 sub_end_time = static_cast<MINT64>(::systemTime());
+        // CAM_LOGD_TIME_SUB("layer(%d) (%d) pivot(%d) buf(%d) %d %d %d -> %f : %s",
+        //               gUnflattenLayer, mMap.size(), pExtractor->getPivot(), buf_size, Tag, type, count,
+        //               ((float)(sub_end_time-sub_start_time))/1000000.f, pExtractor->getString(cur) );
+        cur =  pExtractor->getPivot();
+    }
+    //
+lbExit:
+    MINT64 end_time = static_cast<MINT64>(::systemTime());
+    CAM_LOGD_TIME("layer(%d) unflatten pivot(%d) buf(%d) done! %lld -> %f",
+                  gUnflattenLayer--, pExtractor->getPivot(), buf_size,
+                  end_time-start_time, ((float)(end_time-start_time))/1000000.f );
+    size_t ret = pExtractor->getPivot();
+    delete pExtractor;
+    //
+    return ret;
+}
+
+#undef NORMAL_STRING_TO_ENTRY
+#undef NORMAL_STRING_TO_ENTRY2
+#undef SPECIAL_STRING_TO_ENTRY
+#undef STRING_TO_ENTRY
+
+/******************************************************************************
+ *
+ ******************************************************************************/
+IMetadata::
+IMetadata()
+    : mpImp(new Implementor())
+{
+
+}
+
+
+IMetadata::IMetadata(IMetadata const& other)
+    : mpImp(new Implementor(*(other.mpImp)))
+{
+}
+
+
+IMetadata::
+~IMetadata()
+{
+     if(mpImp) delete mpImp;
+
+}
+
+
+IMetadata&
+IMetadata::operator=(IMetadata const& other)
+{
+    if (this != &other) {
+        delete mpImp;
+        mpImp = new Implementor(*(other.mpImp));
+    }
+    else {
+        CAM_LOGW("this(%p) == other(%p)", this, &other);
+    }
+
+    return *this;
+}
+
+
+IMetadata&
+IMetadata::operator+=(IMetadata const& other)
+{
+    *mpImp += *other.mpImp;
+    return *this;
+}
+
+
+IMetadata const
+IMetadata::operator+(IMetadata const& other)
+{
+    return IMetadata(*this) += other;
+}
+
+
+MBOOL
+IMetadata::
+isEmpty() const
+{
+    return mpImp->isEmpty();
+}
+
+
+MUINT
+IMetadata::
+count() const
+{
+    return mpImp->count();
+}
+
+
+MVOID
+IMetadata::
+clear()
+{
+    mpImp->clear();
+}
+
+
+MERROR
+IMetadata::
+remove(Tag_t tag)
+{
+    return mpImp->remove(tag) >= 0 ? OK : BAD_VALUE;
+}
+
+
+MERROR
+IMetadata::
+sort()
+{
+    return mpImp->sort();
+}
+
+
+MERROR
+IMetadata::
+update(Tag_t tag, IMetadata::IEntry const& entry)
+{
+    MERROR ret = mpImp->update(tag, entry);  //keyedVector has two possibilities: BAD_VALUE/NO_MEMORY
+    return ret >= 0 ? (MERROR)OK : (MERROR)ret;
+}
+
+
+IMetadata::IEntry&
+IMetadata::
+editEntryFor(Tag_t tag)
+{
+    return mpImp->editEntryFor(tag);
+}
+
+
+IMetadata::IEntry const&
+IMetadata::
+entryFor(Tag_t tag) const
+{
+    return mpImp->entryFor(tag);
+}
+
+IMetadata::IEntry&
+IMetadata::
+editEntryAt(MUINT index)
+{
+    return mpImp->editEntryAt(index);
+
+}
+
+
+IMetadata::IEntry const&
+IMetadata::
+entryAt(MUINT index) const
+{
+    return mpImp->entryAt(index);
+}
+
+size_t
+IMetadata::
+flatten(void* flattened, size_t buf_size, size_t pivot)
+{
+    char* flattenedStr = static_cast<char*>(flattened);
+    return mpImp->flatten(flattenedStr, buf_size, pivot);
+}
+
+size_t
+IMetadata::
+unflatten(void* flattened, size_t buf_size, size_t pivot)
+{
+    char* flattenedStr = static_cast<char*>(flattened);
+    return mpImp->unflatten(flattenedStr, buf_size, pivot);
+}
+
+void IMetadata::
+dump(int layer)
+{
+    mpImp->dump(layer);
+}

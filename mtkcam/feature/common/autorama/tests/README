@@ -1,0 +1,14 @@
+Gtest for MTK Camera Autorama feature.
+
+WHAT IT DOES?
+=============
+Unit test Autorama feature.
+
+HOW IT WAS BUILT?
+==================
+Android build flow will buit it.
+
+HOW TO USE IT?
+==============
+
+adb push put the binary execution file to phone, and run it.
